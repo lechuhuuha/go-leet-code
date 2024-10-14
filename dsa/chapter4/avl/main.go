@@ -1,5 +1,10 @@
 package main
 
+import (
+	"encoding/json"
+	"fmt"
+)
+
 // KeyValue type
 type KeyValue interface {
 	LessThan(KeyValue) bool
@@ -178,4 +183,27 @@ func (k integerKey) LessThan(k1 KeyValue) bool {
 }
 func (k integerKey) EqualTo(k1 KeyValue) bool {
 	return k == k1.(integerKey)
+}
+
+// main method
+func main() {
+	var treeNode *TreeNode
+	fmt.Println("Tree is empty")
+	var avlTree []byte
+	avlTree, _ = json.MarshalIndent(treeNode, "", " ")
+	fmt.Println(string(avlTree))
+	fmt.Println("\n Add Tree")
+	InsertNode(&treeNode, integerKey(5))
+	InsertNode(&treeNode, integerKey(3))
+	InsertNode(&treeNode, integerKey(8))
+	InsertNode(&treeNode, integerKey(7))
+	InsertNode(&treeNode, integerKey(6))
+	InsertNode(&treeNode, integerKey(10))
+	avlTree, _ = json.MarshalIndent(treeNode, "", " ")
+	fmt.Println(string(avlTree))
+	fmt.Println("\n Delete Tree")
+	RemoveNode(&treeNode, integerKey(3))
+	RemoveNode(&treeNode, integerKey(7))
+	avlTree, _ = json.MarshalIndent(treeNode, "", " ")
+	fmt.Println(string(avlTree))
 }
