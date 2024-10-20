@@ -34,3 +34,33 @@ func addMatrices(matrix1, maxtrix2 [2][2]int, ops string) [2][2]int {
 	}
 	return sum
 }
+
+func transpose(matrix [2][2]int) [2][2]int {
+	var transMatrix [2][2]int
+	for i := 0; i < 2; i++ {
+		for j := 0; j < 2; j++ {
+			transMatrix[i][j] = matrix[j][i]
+		}
+	}
+
+	return transMatrix
+}
+
+// 1 2 3
+// 4 5 6
+// 7 8 9
+func determinant(matrix [2][2]int) (def float32) {
+	def = float32(matrix[0][0]*matrix[1][1] - matrix[0][1]*matrix[1][0])
+	return
+}
+
+func inverse(matrix [2][2]int) [2][2]float64 {
+	det := float64(determinant(matrix))
+	var inverseMaxtrix [2][2]float64
+	inverseMaxtrix[0][0] = float64(matrix[1][1]) / det
+	inverseMaxtrix[0][1] = -float64(matrix[0][1]) / det
+	inverseMaxtrix[1][0] = -float64(matrix[1][0]) / det
+	inverseMaxtrix[1][1] = -float64(matrix[1][1]) / det
+
+	return inverseMaxtrix
+}
