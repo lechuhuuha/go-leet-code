@@ -41,6 +41,7 @@
 
 4. For a 3 x 3 matrix, write code that calculates the determinant of the matrix.
 
+det=a(ei−fh)−b(di−fg)+c(dh−eg)
 ```go
 func determinant3x3(matrix [3][3]int) (def float32) {
 	def = float32(
