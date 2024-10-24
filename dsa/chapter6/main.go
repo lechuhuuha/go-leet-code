@@ -47,8 +47,8 @@ func main() {
 	distance := func(Thing1 *Thing, Thing2 *Thing) bool {
 		return Thing1.distance < Thing2.distance
 	}
-	var decreasingDistance func(*Thing, *Thing) bool
-	decreasingDistance = func(p1, p2 *Thing) bool {
+
+	decreasingDistance := func(p1, p2 *Thing) bool {
 		return distance(p2, p1)
 	}
 	ByFactor(name).Sort(Things)
@@ -59,4 +59,54 @@ func main() {
 	fmt.Println("By distance:", Things)
 	ByFactor(decreasingDistance).Sort(Things)
 	fmt.Println("By decreasing distance:", Things)
+
+	var commits = []Commit{
+		{"james", "Javascript", 110},
+		{"ritchie", "python", 250},
+		{"fletcher", "Go", 300},
+		{"ray", "Go", 400},
+		{"john", "Go", 500},
+		{"will", "Go", 600},
+		{"dan", "C++", 500},
+		{"sam", "Java", 650},
+		{"hayvard", "Smalltalk", 180},
+	}
+
+	user := func(c1 *Commit, c2 *Commit) bool {
+		return c1.username < c2.username
+	}
+
+	language := func(c1 *Commit, c2 *Commit) bool {
+		return c1.lang < c2.lang
+	}
+
+	increasingLines := func(c1 *Commit, c2 *Commit) bool {
+		return c1.numlines < c2.numlines
+	}
+
+	decreasingLines := func(c1 *Commit, c2 *Commit) bool {
+		return c1.numlines > c2.numlines // Note: > orders downwards.
+	}
+
+	OrderedBy(user).Sort(commits)
+	fmt.Println("By username:", commits)
+
+	OrderedBy(user, increasingLines).Sort(commits)
+	fmt.Println("By username,asc order", commits)
+
+	OrderedBy(user, decreasingLines).Sort(commits)
+	fmt.Println("By username,desc order", commits)
+
+	OrderedBy(language, increasingLines).Sort(commits)
+	fmt.Println("By lang,asc order", commits)
+
+	OrderedBy(language, decreasingLines, user).Sort(commits)
+	fmt.Println("By lang,desc order", commits)
+
+	unOrderedList := UnorderedList{}
+	unOrderedList.AddToHead(1)
+	unOrderedList.AddToHead(3)
+	unOrderedList.AddToHead(5)
+	unOrderedList.AddToHead(7)
+	unOrderedList.IterateList()
 }
