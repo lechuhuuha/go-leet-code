@@ -1,7 +1,6 @@
 package main
 
 import (
-	"bytes"
 	"fmt"
 	"sync"
 )
@@ -64,6 +63,21 @@ func inOrderTraverseTree(treeNode *TreeNode, function func(int)) {
 		function(treeNode.value)
 		inOrderTraverseTree(treeNode.rightNode, function)
 	}
+}
+
+func (tree *BinarySearchTree) PreOrderTree(callback func(int)) {
+	tree.lock.Lock()
+	defer tree.lock.Unlock()
+	preOrderTree(tree.rootNode, callback)
+}
+
+func preOrderTree(treeNode *TreeNode, callback func(int)) {
+	if treeNode == nil {
+		return
+	}
+	callback(treeNode.value)
+	preOrderTree(treeNode.leftNode, callback)
+	preOrderTree(treeNode.rightNode, callback)
 }
 
 // MaxNode method
@@ -186,86 +200,43 @@ func stringify(treeNode *TreeNode, level int) {
 	}
 }
 
-// main method
+type TreeSet struct {
+	bst *BinarySearchTree
+}
+
+func (t *TreeSet) Insert(treeNodes ...TreeNode) {
+	for _, treeNode := range treeNodes {
+		t.bst.InsertElement(treeNode.key, treeNode.value)
+	}
+}
+
+func (t *TreeSet) Delete(treeNodes ...TreeNode) {
+	for _, treeNode := range treeNodes {
+		t.bst.RemoveNode(treeNode.key)
+	}
+}
+
+func (t *TreeSet) Search(treeNodes ...TreeNode) bool {
+	for _, treeNode := range treeNodes {
+		if exists := t.bst.SearchNode(treeNode.value); !exists {
+			return false
+		}
+	}
+	return true
+}
+
+func (t *TreeSet) String() {
+	t.bst.String()
+}
+
 func main() {
-	var tree *BinarySearchTree = &BinarySearchTree{}
-	tree.InsertElement(8, 8)
-	tree.InsertElement(3, 3)
-	tree.InsertElement(10, 10)
-	tree.InsertElement(1, 1)
-	tree.InsertElement(6, 6)
-	tree.String()
-
-	tr := New(NewNode(Int(5)))
-	tr.Insert(NewNode(Int(3)))
-	tr.Insert(NewNode(Int(17)))
-	tr.Insert(NewNode(Int(7)))
-	tr.Insert(NewNode(Int(1)))
-	/*
-	       5
-	      / \
-	     3   17
-	    /    /
-	   1    7
-	*/
-
-	fmt.Println("Min:", tr.Min().Key)             // Min: 1
-	fmt.Println("Max:", tr.Max().Key)             // Max: 17
-	fmt.Println("Search:", tr.Search(Int(7)).Key) // Search: 7
-
-	buf1 := new(bytes.Buffer)
-	ch1 := make(chan string)
-	go tr.PreOrder(ch1) // root, left, right
-	for {
-		v, ok := <-ch1
-		if !ok {
-			break
-		}
-		buf1.WriteString(v)
-		buf1.WriteString(" ")
-	}
-	fmt.Println("PreOrder:", buf1.String()) // PreOrder: 5 3 1 17 7
-
-	buf2 := new(bytes.Buffer)
-	ch2 := make(chan string)
-	go tr.InOrder(ch2) // left, root, right
-	for {
-		v, ok := <-ch2
-		if !ok {
-			break
-		}
-		buf2.WriteString(v)
-		buf2.WriteString(" ")
-	}
-	fmt.Println("InOrder:", buf2.String()) // 1 3 7 17 5
-
-	buf3 := new(bytes.Buffer)
-	ch3 := make(chan string)
-	go tr.PostOrder(ch3) // left, right, root
-	for {
-		v, ok := <-ch3
-		if !ok {
-			break
-		}
-		buf3.WriteString(v)
-		buf3.WriteString(" ")
-	}
-	fmt.Println("PostOrder:", buf3.String()) // 1 3 7 17 5
-
-	buf4 := new(bytes.Buffer)
-	nodes4 := tr.LevelOrder() // from top-level
-	for _, v := range nodes4 {
-		buf4.WriteString(fmt.Sprintf("%v ", v.Key))
-	}
-	fmt.Println("LevelOrder:", buf4.String()) // 5 3 17 1 7
-
-	tr2 := New(NewNode(Int(5)))
-	tr2.Insert(NewNode(Int(3)))
-	tr2.Insert(NewNode(Int(17)))
-	tr2.Insert(NewNode(Int(7)))
-	tr2.Insert(NewNode(Int(1)))
-
-	fmt.Println("ComparePreOrder:", ComparePreOrder(tr, tr2))   // true
-	fmt.Println("CompareInOrder:", CompareInOrder(tr, tr2))     // true
-	fmt.Println("ComparePostOrder:", ComparePostOrder(tr, tr2)) // true
+	var treeset *TreeSet = &TreeSet{}
+	treeset.bst = &BinarySearchTree{}
+	var node1 TreeNode = TreeNode{8, 8, nil, nil}
+	var node2 TreeNode = TreeNode{3, 3, nil, nil}
+	var node3 TreeNode = TreeNode{10, 10, nil, nil}
+	var node4 TreeNode = TreeNode{1, 1, nil, nil}
+	var node5 TreeNode = TreeNode{6, 6, nil, nil}
+	treeset.Insert(node1, node2, node3, node4, node5)
+	treeset.String()
 }
