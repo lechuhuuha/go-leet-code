@@ -24,4 +24,12 @@ func main() {
 		25, 4, 5, 97, 1000, 27}
 	sorting.ShellSort(elements)
 	fmt.Println(elements)
+
+	elements = sorting.RandomSequence(40)
+	fmt.Println("\n Before Sorting \n\n", elements)
+	fmt.Println("\n-After Sorting\n\n", sorting.MergeSort(elements))
+
+	elements = sorting.RandomSequence(40)
+	fmt.Println("\n Before Quick Sorting \n\n", elements)
+	fmt.Println("\n-After Quick Sorting\n\n", sorting.QuickSort(elements))
 }
