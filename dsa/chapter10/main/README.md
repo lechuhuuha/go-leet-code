@@ -56,5 +56,95 @@
 - It also takes care of the condition so that no black object points to a white object.
 
 8. What are the criteria for promoting objects to older generations?
+
+- The algorithm promotes objects to older generations based on the age of the object in the
+  garbage collection cycle.
+
 9. Draw a flow chart for the cache management algorithm.
+   ![cache-management-flowchat](Cache-control-flowchart.png)
+
 10. How do you get indirect memory access outside a method's stack frame?
+
+- You can achieve indirect memory access outside a method's stack frame primarily through the use of pointers, closures, and heap-allocated data.
+
+* Using Pointers for Heap-Allocated Data
+
+```go
+func createInt() *int {
+  num := new(int)  // Allocates memory on the heap
+  *num = 42
+  return num       // Returns pointer to heap-allocated memory
+}
+
+func main() {
+    ptr := createInt()
+    fmt.Println(*ptr) // Accesses memory outside the stack frame of `createInt`
+}
+```
+
+- Passing Pointers to Modify Variables in Other Frames.
+
+```go
+func modifyValue(ptr *int) {
+    *ptr = 100 // Modifies variable indirectly through the pointer
+}
+
+func main() {
+    value := 50
+    modifyValue(&value) // Pass address of `value` to another function
+    fmt.Println(value)   // Outputs: 100
+}
+
+```
+
+- Using Closures to Capture Variables by Reference
+
+```go
+func createCounter() func() int {
+    counter := 0
+    return func() int {
+        counter++   // `counter` is captured by reference
+        return counter
+    }
+}
+
+func main() {
+    counterFunc := createCounter()
+    fmt.Println(counterFunc()) // Outputs: 1
+    fmt.Println(counterFunc()) // Outputs: 2
+}
+
+```
+
+- Structs with Pointers to External Data
+
+```go
+type DataHolder struct {
+    data *int
+}
+
+func createDataHolder(value int) DataHolder {
+    return DataHolder{data: &value} // Holds a pointer to `value` outside function scope
+}
+
+func main() {
+    value := 42
+    holder := createDataHolder(value)
+    fmt.Println(*holder.data) // Indirectly accesses `value` from outside its original scope
+}
+
+```
+
+- Using Slices and Maps for Dynamic Memory Allocation
+
+```go
+func modifySlice(s []int) {
+    s[0] = 100 // Modifies the underlying array
+}
+
+func main() {
+    slice := []int{1, 2, 3}
+    modifySlice(slice)
+    fmt.Println(slice) // Outputs: [100, 2, 3], demonstrating indirect access
+}
+```
