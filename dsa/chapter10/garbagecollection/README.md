@@ -2,6 +2,8 @@
 
 - Garbage collection is a type of programmed memory management in which memory, currently occupied by objects that will never be used again, is gathered.
 
+- It's a system that recycles memory on behalf of the application by indentifying which parts of memory are no longer needed.
+
 - John McCarthy was the first person to come up with garbage collection for managing Lisp memory management.
 
 - This technique specifies which objects need to be de-allocated, and then discharges the memory.
@@ -11,8 +13,6 @@
 - Understand costs by looking into the Go GC.
 
 - Use these insights to improve application's resource utilization.
-
-- A GC or garbage collection is a system that recycles memory on behalf of the application by indentifying which parts of memory are no longer needed.
 
 - The Go standard toolchain provides a runtime library that ships with every application, and this runtime library includes a garbage collector.
 
@@ -97,3 +97,13 @@
 
   * As a result, the act of sweeping must be entirely separated from the act of marking. Furthermore, the GC may also not be active at all, when there's no GC-related work to do.
   * The GC continuously rotates through three phase of sweeping, off and marking in what's known as the GC cycle.
+
+## Understanding costs
+
+- The GC is a complex piece of software built on even more complex systems.
+- The model of GC cost based on three simple axioms.
+  - The GC involves only two resources: CPU time and physical memory.
+  - The GC's memory costs consist of live heap memory, new heap memory allocated before the mark phase, and space for metadata that, even if proportional to the previous costs, are small in comparison.
+    _Note: live heap memory is memory that was determined to be live by the previous GC cycle, while new heap memory is any memory allocateed in the current cycle, which may or may not be live by the end._
+  - The GC's CPU costs are modeled as a fixed cost per cycle, and marginal cost that scales proportionally with the size of the live heap.
+    _Note: Asymptotically speaking, sweeping scales worse than marking and scanning, as it must perform work proportional to the size of the whole heap, including memory that is determined to be not live ("dead"), in the current implentaion sweeping is so much faster then marking and scanning that its associated costs can be ignored in this discussion._
