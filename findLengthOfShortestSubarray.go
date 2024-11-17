@@ -25,6 +25,5 @@ func findLengthOfShortestSubarray(arr []int) int {
 		ans = min(ans, right-left-1)
 		left++
 	}
-
 	return ans
 }
