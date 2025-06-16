@@ -1,20 +1,39 @@
 package main
 
 import (
-	"fmt"
 	"reflect"
 	"testing"
 )
 
-// Helper function to pre-order traverse the BST and collect values
-func preOrderTraversal(node *TreeNode, result *[]int) {
-	if node == nil {
-		*result = append(*result, -1) // Representing nil as -1 for easier validation
-		return
+// Helper function to convert BST to level-order traversal array
+func levelOrderTraversal(root *TreeNode) []int {
+	if root == nil {
+		return []int{-1}
 	}
-	*result = append(*result, node.Val)
-	preOrderTraversal(node.Left, result)
-	preOrderTraversal(node.Right, result)
+
+	result := []int{}
+	queue := []*TreeNode{root}
+
+	for len(queue) > 0 {
+		node := queue[0]
+		queue = queue[1:]
+
+		if node == nil {
+			result = append(result, -1)
+			continue
+		}
+
+		result = append(result, node.Val)
+		queue = append(queue, node.Left, node.Right)
+	}
+
+	// Trim trailing -1s
+	for i := len(result) - 1; i >= 0; i-- {
+		if result[i] != -1 {
+			return result[:i+1]
+		}
+	}
+	return result
 }
 
 func TestSortedArrayToBST(t *testing.T) {
@@ -26,12 +45,12 @@ func TestSortedArrayToBST(t *testing.T) {
 		{
 			name:     "Example 1",
 			nums:     []int{-10, -3, 0, 5, 9},
-			expected: []int{0, -3, 9, -10, -1, 5}, // Pre-order: [root, left subtree, right subtree]
+			expected: []int{0, -3, 9, -10, -1, 5}, // Level-order traversal
 		},
 		{
 			name:     "Example 2",
 			nums:     []int{1, 3},
-			expected: []int{1, -1, 3, -1, -1}, // Another valid result could be: []int{3, 1, -1, -1, -1}
+			expected: []int{3, 1}, // Level-order traversal
 		},
 		{
 			name:     "Empty Input",
@@ -43,12 +62,8 @@ func TestSortedArrayToBST(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			root := sortedArrayToBST(tt.nums)
-			fmt.Println(root)
-			// Generate the pre-order traversal of the result tree
-			var result []int
-			preOrderTraversal(root, &result)
+			result := levelOrderTraversal(root)
 
-			// Compare the result with the expected value
 			if !reflect.DeepEqual(result, tt.expected) {
 				t.Errorf("sortedArrayToBST(%v) = %v, expected %v", tt.nums, result, tt.expected)
 			}

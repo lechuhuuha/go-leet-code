@@ -1,7 +1,5 @@
 package main
 
-import "fmt"
-
 // TreeNode represents a node in a binary tree
 type TreeNode struct {
 	Val   int
@@ -18,23 +16,16 @@ type TreeNode struct {
  * }
  */
 func sortedArrayToBST(nums []int) *TreeNode {
-	// Key Idea: Let us recursively build the trees
-	n := len(nums)
-
 	// Base cases
-	if n == 0 {
+	if len(nums) == 0 {
 		return nil
 	}
 
-	if n == 1 {
-		return &TreeNode{Val: nums[0]}
-	}
+	mid := len(nums) / 2
+	root := &TreeNode{Val: nums[mid]}
 
-	l, r := 0, n-1
-	mid := l + (r-l)/2
-	fmt.Println(nums[:mid], nums[mid+1:], nums[mid])
-	newRoot := &TreeNode{Val: nums[mid]}
-	newRoot.Left, newRoot.Right = sortedArrayToBST(nums[:mid]), sortedArrayToBST(nums[mid+1:])
+	root.Left = sortedArrayToBST(nums[:mid])
+	root.Right = sortedArrayToBST(nums[mid+1:])
 
-	return newRoot
+	return root
 }

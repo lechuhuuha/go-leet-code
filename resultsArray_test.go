@@ -13,19 +13,19 @@ func TestResultsArray(t *testing.T) {
 		output []int
 	}{
 		{
-			name:   "case1",
+			name:   "test case positive - increasing sequence",
 			nums:   []int{1, 2, 3, 4, 3, 2, 5},
 			k:      3,
 			output: []int{3, 4, -1, -1, -1},
 		},
 		{
-			name:   "case2",
+			name:   "test case negative - all same numbers",
 			nums:   []int{2, 2, 2, 2, 2},
 			k:      4,
 			output: []int{-1, -1},
 		},
 		{
-			name:   "case3",
+			name:   "test case negative - alternating numbers",
 			nums:   []int{3, 2, 3, 2, 3, 2},
 			k:      2,
 			output: []int{-1, 3, -1, 3, -1},
