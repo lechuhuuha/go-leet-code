@@ -1,0 +1,28 @@
+Brute force is checking every pair, which is O(n²) time and O(1) space
+Optimized approach uses a hash map from value to index
+For each number, I compute target - x and check whether that complement was seen before
+If yes, I return the stored index and current index
+Otherwise, I store the current value and its index
+Complexity is O(n) time and O(n) space
+
+in the first loop
+we have x as 3
+we have an empty hash map
+we then calculate the complement = target which is 6 minus x which is 3 = 3
+check the hashmap 
+is empty so we store the 3 -> 0 
+
+next element we have x as 2
+we have a hash map with value
+we then calculate the complement = target which is 6 minus x which is 2 = 4
+check the hashmap
+is not in the hashmap
+so we store the 2 as new value 2 -> 1
+
+final element we have x as 4
+we have a hash map with value
+we then calculate the complement = target which is 6 minus x which is 4 = 2
+check the hashmap
+is in the hashmap with key = 2
+we return the storedIndex, current index which is 1 and 2
+[1,2]
