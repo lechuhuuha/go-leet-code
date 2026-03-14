@@ -1,0 +1,14 @@
+Given a string s, find the length of the longest substring that contains at most 2 distinct characters.
+eceba
+
+i would choose hashmap + sliding window
+the sliding window will run from start to finish
+and we will keep a hashmap of seen char
+
+the window is valid while it contains at most 2 distinct characters
+it becomes invalid when the number of distinct characters becomes 3
+
+This problem cares about how many distinct characters are currently inside the window
+So I use a count map, because when the left pointer moves, I need to decrement the count of the outgoing character
+If its count becomes zero, I remove it from the map
+That lets me know exactly when the window has more than 2 distinct characters
