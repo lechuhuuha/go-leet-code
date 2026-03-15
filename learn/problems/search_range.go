@@ -12,12 +12,13 @@ func searchRange(nums []int, target int) []int {
 
 	for low <= high {
 		mid := low + (high-low)/2
-		if nums[mid] == target {
+		testNum := nums[mid]
+		if testNum == target {
 			lowAns = mid
 			high = mid - 1 // discard the right, check the left. Since now high is the previous char to mid
-		} else if nums[mid] < target {
+		} else if testNum < target {
 			low = mid + 1
-		} else if nums[mid] > target {
+		} else if testNum > target {
 			high = mid - 1
 		}
 	}
@@ -26,16 +27,15 @@ func searchRange(nums []int, target int) []int {
 	high = len(nums) - 1
 	for low <= high {
 		mid := low + (high-low)/2
-
-		if nums[mid] == target {
+		testNum := nums[mid]
+		if testNum == target {
 			highAns = mid
 			low = mid + 1 // discard the left, because the low is now the next char after mid
-		} else if nums[mid] < target {
+		} else if testNum < target {
 			low = mid + 1
-		} else if nums[mid] > target {
+		} else if testNum > target {
 			high = mid - 1
 		}
 	}
-	result := []int{lowAns, highAns}
-	return result
+	return []int{lowAns, highAns}
 }
