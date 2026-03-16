@@ -1,0 +1,41 @@
+Given a string s containing only:
+'(', ')', '{', '}', '[', ']'
+return true if the string is valid.
+
+A string is valid if:
+every opening bracket has a matching closing bracket
+brackets close in the correct order
+Example:
+"()[]{}" → true
+"(]" → false
+"([)]" → false
+"{[]}" → true
+
+s = "([{}])" → what happens step by step?
+we initiate the empty stack []string{}
+we will loop through the string
+first loop
+value = "("
+we check this is one of the opening bracket
+so we push this to stack
+stack.push(value)
+we continue doing this for index 2 which is "{"
+
+now the fourth loop
+value = "}"
+we check this is one of the closing bracket
+so we use stack.peek() to see the top of the stack which is "{"
+that a matching pair bracket so we use stack.Pop() to remove "{" from the stack
+continue with "]",")"
+
+now we finish the loop 
+and the stack is now ""
+and the string is a valid parenthesis
+
+s = "([)]" → at which exact character does it fail, and why?
+it will fail at the 2 index which is ")"
+because we have "[" at the top of the stack
+and those 2 dont match so it will not Pop
+and the stack will remain "(["
+
+which is not a valid parenthesis
