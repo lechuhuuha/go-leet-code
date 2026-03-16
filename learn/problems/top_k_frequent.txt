@@ -1,0 +1,129 @@
+A good next question for yourself is: after ReplaceRoot(node), why is heapifyDown(0) enough, and why do we not need shiftUp there?
+
+After replacing the root, the new node is already at index 0, so it has no parent above it.
+That means the only possible heap violation is with its children.
+So I only need to restore order downward using heapifyDown(0).
+shiftUp is used when inserting at the end, because that new node may violate heap order with its parent.
+
+why must you swap with the smaller of the two children, not just the left one first?
+When both children are smaller than the current node, I must swap with the smaller child to preserve the min-heap property in one step.
+If I swap with the larger child first, the other child may still be smaller than the parent, so the heap remains invalid.
+
+nums: []int{9, 9, 9, 9, 8, 8, 7, 7, 7, 6},
+k:    2,
+want: []int{7, 9},
+
+freqMap = {
+	9 -> 4,
+	8 -> 2,
+	7 -> 3,
+	6 -> 1
+}
+
+loop through freqMap
+first loop
+value 9
+frequency 4
+create new node
+heapNode{
+	value: 9,
+	frequency: 4
+}
+
+minHeap.len() = 0
+minHeap.len() < k = 0 < 2
+so we push newNode to minHeap
+in the push func
+we push the node at the end of minHeap
+use shiftUp func with parameter at the end of the minHeap len(*h) - 1 =  1 - 1 = 0
+
+since the index is equal to 0
+the index is already at the root of the minHeapNode
+we stop
+
+second loop
+value 8
+frequency 2
+
+create new node
+heapNode{
+	value: 8,
+	frequency: 2
+}
+minHeap.len() = 1
+minHeap.len() < k = 1 < 2
+so we push newNode to minHeap
+in the push func
+we push the node at the end of minHeap
+use shiftUp func with parameter at the end of the minHeap len(*h) - 1 =  2 - 1 = 1
+we will use the index > 0 as the for loop condition because we check until the current index is at the root, that when we have move all the correct node to the correct position
+in the first loop
+parent := (index - 1) / 2 = (1 - 1) / 2 = 0
+h[index].frequency = h[1].frequency = 2
+h[parent].frequency = h[0].frequency = 4
+since h[index].frequency < h[parent].frequency
+we switch index with parent
+h[index], h[parent] = h[parent], h[index] 
+h[1], h[0] = h[0], h[1]
+index = parent
+index = 0
+the next loop
+since index is now at the root we can exit the loop
+
+third loop
+value 7
+frequency 3
+create new node
+heapNode{
+	value: 7,
+	frequency: 3
+}
+
+minHeap.len() = 2
+minHeap.len() < k = 2 < 2
+we check other condition
+frequency > minHeap[0].frequency
+3 > 2
+so we use ReplaceRoot with node
+in ReplaceRoot we replace the root node with current node
+then we call heapifyDown
+in heapifyDown
+we loop with condition true since we need to move all the node at their corect position
+
+the first loop
+smallest := index = 0
+leftChild := 2*index + 1 = 2*0 + 1 = 1
+rightChild := 2*index + 2 = 2*0 + 2 = 2
+we check if leftChild is out of bound
+is not
+we check if leftChild.frequency is smaller then the current smallest frequency
+(*h)[leftChild].frequency = (*h)[1].frequency = 4
+(*h)[smallest].frequency = (*h)[0].frequency = 3
+(*h)[leftChild].frequency < (*h)[smallest].frequency
+
+we check if rightChild is out of bound
+it is
+
+we check if smallest == index
+smallest == index
+so we break
+
+fourth loop is the same 
+
+now the final loop
+value 6
+frequency 1
+
+minHeap.len() = 2
+minHeap.len() == 2
+so we check if the current frequency larger than root frequency or not
+the reason for this check is because if the current frequency is larger then the root then it should able to append to minHeap and we can remove the root
+frequency < minHeap[0].frequency 
+1 < 1
+we skip this value
+
+now the final loop
+we will loop through minHeap until we pop all the value from minHeap
+and append the node.value to result
+
+the result is {7, 9}
