@@ -1,0 +1,64 @@
+we use two pointer for this case because we want to compare each character with its matching character from the other side
+
+we will have 2 pointer
+one pointer start at the front of the string
+one pointer start at the end of the string
+
+if both side are the same
+we move left pointer up by 1
+and move right pointer down by 1
+
+we keep doing this until:
+left == right
+that means we reach the middle and everything before that already matched
+
+or
+left > right
+that means the pointers already cross each other and all matched too
+
+if at any point left side and right side are not the same
+we can return false right away
+
+if we finish the loop without mismatch
+that means the string is palindrome
+
+example 1
+s = "radar"
+len(s) = 5
+left = 0
+right = 4
+
+first loop
+s[left] == s[right]
+r == r
+left = 1
+right = 3
+
+second loop
+s[left] == s[right]
+a == a
+left = 2
+right = 2
+
+stop here because left == right
+return true
+
+example 2
+s = "abba"
+left = 0
+right = 3
+
+first loop
+s[left] == s[right]
+a == a
+left = 1
+right = 2
+
+second loop
+s[left] == s[right]
+b == b
+left = 2
+right = 1
+
+stop here because left > right
+return true
