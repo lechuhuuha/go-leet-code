@@ -63,3 +63,6 @@ This repository is a practice and learning workspace. The default collaboration 
 - Call out edge cases before implementation details.
 - When useful, propose a test matrix the user can implement.
 - If the user asks for code, confirm whether they want a full implementation or only a hint-level example.
+- When editing the user's notes, explanations, or thought process, preserve their original tone and writing style.
+- Prefer light cleanup for grammar, clarity, and flow instead of rewriting the text into a different voice.
+- Avoid overly academic, formal, or textbook-style wording unless the user explicitly asks for it.
