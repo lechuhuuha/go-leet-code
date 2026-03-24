@@ -1,0 +1,109 @@
+init empty monotonicStack
+init empty result output
+for loop with temperatures
+first loop
+index = 0
+value = 73
+stack is empty
+push index 0 into stack
+add output[0] = 1
+stack = [0]
+
+second loop
+index = 1
+value = 74
+temperatures[i] = 74
+stack.Peek() = 0 = 73
+temperatures[i] > stack.Peek() && stack len > 0
+add output[0] = 1 - stack.Pop() = 1 - 0 = 1
+since stack len = 0
+we add current index 1 to stack
+stack = [1]
+
+third loop
+index = 2
+value = 75
+temperature[i] = 75
+stack len = 1
+stack.Peek() = 1 = 74
+temperatures[i] > stack.Peek() && stack len > 0
+add output[1] = 2 - stack.Pop() = 2 - 1 = 1
+since stack len = 0
+we add current index 2 to stack
+stack = [2]
+
+fourth loop
+index = 3
+value = 71
+stack len > 1 && temperatures[i] < stack.Peek() = 71 < 75
+we push 3 into stack
+stack = [2,3]
+
+fifth loop
+index = 4
+value = 69
+same as index 3
+we push 4 into stack
+stack = [2,3,4]
+
+sixth loop
+index = 5
+value = 72
+stack len = 3
+temperatures[i] = 72
+stack.Peek() = 4 = 69
+stack.len > 0 && temperatures[i] > stack.Peek()
+we get output for that stack.Peek()
+output[4] = 5 - 4 = 1
+stack = [2,3]
+
+since stack.len > 0 && temperatures[i] > stack.Peek()
+stack.Peek() = 3 = 71
+we get output for that stack.Peek()
+output[3] = 5 - 3 = 2
+
+since stack.len > 0 && temperatures[i] < stack.Peek()
+we push current i into stack
+stack = [2,5]
+
+seventh loop
+index = 6
+value = 76
+stack len = 2
+temperatures[i] = 76
+stack.Peek() = 5 = 72
+since stack.len > 0 && temperatures[i] > stack.Peek()
+we get output for that stack.Peek()
+output[5] = 6 - 5 = 1
+
+since stack.len > 0 && temperatures[i] > stack.Peek()
+we get output for that stack.Peek()
+output[2] = 6 - 2 = 4
+
+now stack len = 0
+we push current index into stack
+stack = [6]
+
+eightth loop
+index = 7
+value = 73
+stack len = 1
+temperatures[i] = 73
+stack.Peek() = 76
+since stack.len > 0 && temperatures[i] < stack.Peek()
+we push current i into stack
+stack = [6,7]
+
+we now have final loop for left over stack
+first loop
+len stack = 2
+output[6] = 0
+
+next loop
+len stack = 1
+output[7] = 0
+
+now stack len is 0 break loop
+
+return output as
+[1,1,4,2,1,1,0,0]
