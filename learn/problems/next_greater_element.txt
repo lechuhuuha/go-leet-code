@@ -1,0 +1,56 @@
+init the output with the len of nums1
+the default value for each element is -1
+init the map
+init the monotonicStack
+
+fill the output with -1 so if we dont find next greater element for that val we dont need to care
+
+for loop the nums2
+first loop
+index = 0
+value = 1
+stack len is 0
+so we push 1 into stack
+
+next loop
+index = 1
+value = 3
+stack len is 1
+and current value 3 is larger than 1
+pop the 1
+push 1 as value of map and current value of nums2  3 as value
+stack is []
+
+next loop
+idnex = 2
+value = 4
+stack len is 0
+so we push 4 into stack
+
+next loop
+index = 3
+value = 2
+stack len is 1
+and current value of nums2 is 2 smaller then 4
+we push 2 into stack
+
+all looped
+
+next we loops the nums1
+first loop
+index = 0, value = 4
+check if map have that key
+we dont
+
+second loop
+index = 1, value = 1
+check if map have that key
+we have
+add output[current index] = 3
+
+third loop
+index = 2, value = 2
+check if map have that key
+we dont
+
+return output = [-1,3,-1]
