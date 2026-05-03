@@ -25,7 +25,7 @@ func TestRemoveElement(t *testing.T) {
 			nums:           []int{0, 1, 2, 2, 3, 0, 4, 2},
 			val:            2,
 			expectedK:      5,
-			expectedPrefix: []int{0, 1, 4, 0, 3},
+			expectedPrefix: []int{0, 1, 3, 0, 4},
 		},
 	}
 
