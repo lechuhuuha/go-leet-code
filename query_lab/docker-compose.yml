@@ -1,0 +1,23 @@
+services:
+  postgres:
+    build:
+      context: .
+    environment:
+      POSTGRES_DB: query_lab
+      POSTGRES_USER: query_lab
+      POSTGRES_PASSWORD: query_lab
+      ORDERS_ROW_COUNT: ${ORDERS_ROW_COUNT:-20000000}
+      CUSTOMER_COUNT: ${CUSTOMER_COUNT:-100000}
+    ports:
+      - "${POSTGRES_PORT:-55432}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./queries:/queries:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U query_lab -d query_lab"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+volumes:
+  postgres_data:
