@@ -1,0 +1,60 @@
+init a map to store key of the sorted value of each string, and the value is the slice of string
+
+init a 2d slice of string
+
+loop through input
+first loop
+eat
+since this is all strings contain lowercase English letters a-z that mean no utf 8 involved, i can use sort by byte
+faster and dont have to handle the utf like rune
+
+b := []byte(s)
+sort.Slice(b, func(i, j int) bool { return b[i] < b[j] })
+key := string(b)
+we append the string to the map with the key
+
+next loop
+tea
+do the same and see that this is the same as eat
+we append the string to the map with the key
+
+until the end of the loop
+
+next up we loop through each key in the map
+and append it slice value to the result
+
+QA
+Complexity.
+Time is O(n) we walk through all the element in the slice
+Space is O(n2) since we still append to a 2D slice 
+
+Can you optimize this without sorting each string?
+Assume all strings only contain lowercase a-z.
+Please explain the idea first, then write Go code.
+
+i have an idea of turning each string into rune and plus them together
+we will have a total value of each string
+and will use it as key 
+but it is not safe for grouping anagrams in general, because different words can have the same sum. For example:
+
+"ad" -> 97 + 100 = 197
+"bc" -> 98 + 99 = 197
+
+i keep thinking then we can also have a solution to 
+Count characters
+
+Since the input is lowercase English letters, you can count a-z.
+
+func countKey(s string) [26]int {
+	var count [26]int
+
+	for _, ch := range s {
+		count[ch-'a']++
+	}
+
+	return count
+}
+
+using a char as a minus value
+since is the smallest in a-z
+we can have the correct key we need for the map
