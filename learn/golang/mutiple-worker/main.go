@@ -47,13 +47,13 @@ func main() {
 
 		go func(list []int) {
 			worker(list, chanResult, chanErr)
-			chanWait <- 1
+			chanWait <- 1 // wg.add(1)
 		}(list)
 	}
 
 	go func() {
 		for i := 0; i < workerInstance; i++ {
-			<-chanWait
+			<-chanWait // wg.done()
 		}
 		close(chanWait)
 		close(chanErr)
