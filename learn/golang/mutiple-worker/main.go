@@ -8,7 +8,11 @@ import (
 )
 
 func main() {
+	var (
+		workerInstance = 0
+	)
 	list := flag.String("list", "", "")
+	flag.IntVar(&workerInstance, "worker-instance", 1, "number of worker")
 	flag.Parse()
 
 	stringNums := strings.Split(*list, ",")
@@ -19,7 +23,6 @@ func main() {
 	}
 	fmt.Println(*list)
 	total := 0
-	workerInstance := 2
 	totalItems := len(nums) // 6
 
 	// accept a list of int
@@ -52,7 +55,8 @@ func main() {
 	}
 
 	go func() {
-		for i := 0; i < workerInstance; i++ {
+		fmt.Println("total amount of worker fired: ", len(chanWait))
+		for i := 0; i < len(chanWait); i++ {
 			<-chanWait // wg.done()
 		}
 		close(chanWait)
