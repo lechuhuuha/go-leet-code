@@ -3,7 +3,14 @@ package main
 import (
 	"fmt"
 	"net/http"
+	"slices"
 	"time"
+)
+
+var (
+	retryAbleMethod    = []string{http.MethodGet, http.MethodHead, http.MethodOptions, http.MethodPut, http.MethodDelete}
+	nonRetryAbleMethod = []string{http.MethodPost, http.MethodPatch}
+	idempotencyKey     = "abc-123"
 )
 
 type HeaderTransport struct {
@@ -16,12 +23,12 @@ func (t *HeaderTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 	if next == nil {
 		next = http.DefaultTransport
 	}
-
+	currentReq := req.Clone(req.Context())
 	for key, value := range t.Headers {
-		req.Header.Set(key, value)
+		currentReq.Header.Set(key, value)
 	}
 
-	return next.RoundTrip(req)
+	return next.RoundTrip(currentReq)
 }
 
 type LoggingTransport struct {
@@ -45,13 +52,21 @@ type RetryTransport struct {
 	MaxRetries int
 }
 
+func isMethodNonRetryable(header string) bool {
+	return slices.Contains(nonRetryAbleMethod, header)
+}
+
 func (t *RetryTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 	next := t.Next
 	if next == nil {
 		next = http.DefaultTransport
 	}
+	backoffTime := 100 * time.Millisecond
+	exponential := 2
+	maxBackoffTime := 400 * time.Millisecond
+
 	for attempt := 0; attempt <= t.MaxRetries; attempt++ {
-		currentReq := req
+		currentReq := req.Clone(req.Context())
 
 		if attempt > 0 && req.Body != nil { // second try and the body is drained
 			if req.GetBody == nil {
@@ -62,10 +77,21 @@ func (t *RetryTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 				return nil, err
 			}
 
-			currentReq = req.Clone(req.Context())
 			currentReq.Body = body
 		}
 
+		if attempt > 0 {
+			fmt.Printf("Waiting %v before retry attempt %d...\n", backoffTime, attempt)
+			timer := time.NewTimer(backoffTime)
+			select {
+			case <-timer.C:
+			case <-currentReq.Context().Done():
+				fmt.Println("context cancelled")
+				timer.Stop()
+				return nil, currentReq.Context().Err()
+			}
+			backoffTime = min(backoffTime*time.Duration(exponential), maxBackoffTime)
+		}
 		resp, err := next.RoundTrip(currentReq)
 		if err != nil {
 			if attempt == t.MaxRetries {
@@ -77,6 +103,12 @@ func (t *RetryTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 
 		if resp.StatusCode < 500 {
 			return resp, nil
+		}
+
+		idemKey := currentReq.Header.Get("Idempotency-Key")
+
+		if isMethodNonRetryable(currentReq.Method) && idemKey != "" {
+			return nil, fmt.Errorf("non retryable method header")
 		}
 
 		if attempt == t.MaxRetries {
@@ -104,14 +136,16 @@ func main() {
 		},
 	}
 
-	req, _ := http.NewRequest("GET", "https://examdsfsdfple.com", nil)
-
+	req, _ := http.NewRequest("POST", "https://examdsfsdfple.com", nil)
+	// req.Header.Add("Idempotency-Key", "abc-123")
 	resp, err := client.Do(req)
 	if err != nil {
 		fmt.Println(err)
+		return
 	}
 
 	defer resp.Body.Close()
+
 	fmt.Println(req.Header)
 
 	fmt.Println(resp)
