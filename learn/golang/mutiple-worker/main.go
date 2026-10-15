@@ -50,16 +50,16 @@ func main() {
 
 		go func(list []int) {
 			worker(list, chanResult, chanErr)
-			chanWait <- 1 // wg.add(1)
+			chanWait <- 1 // wg.Add(1)
 		}(list)
 	}
 
 	go func() {
 		fmt.Println("total amount of worker fired: ", len(chanWait))
 		for i := 0; i < len(chanWait); i++ {
-			<-chanWait // wg.done()
+			<-chanWait // wg.Done()
 		}
-		close(chanWait)
+		close(chanWait) // wg.Wait)
 		close(chanErr)
 		close(chanResult)
 
