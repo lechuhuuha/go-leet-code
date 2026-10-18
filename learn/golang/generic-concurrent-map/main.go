@@ -64,6 +64,17 @@ func Filter[T any](ctx context.Context, inputChan <-chan T, workers int, predica
 	return out
 }
 
+func Reduce[T any, R any](
+	input <-chan T,
+	initial R,
+	fn func(R, T) R,
+) R {
+	for value := range input {
+		initial = fn(initial, value)
+	}
+	return initial
+}
+
 func Map[T any, R any](
 	ctx context.Context,
 	inputChan <-chan T,
@@ -107,6 +118,64 @@ func Map[T any, R any](
 	return out
 }
 
+func MapErr[T any, R any](
+	ctx context.Context,
+	input <-chan T,
+	workers int,
+	fn func(T) (R, error),
+) <-chan Result[R] {
+	out := make(chan Result[R])
+	wg := sync.WaitGroup{}
+	if workers <= 0 {
+		workers = 1
+	}
+
+	for i := 0; i < workers; i++ {
+		wg.Add(1)
+		go func(i int) {
+			defer wg.Done()
+			for {
+				select {
+				case <-ctx.Done():
+					fmt.Printf("Worker %d: Context cancelled. Exiting.\n", i)
+					return
+				case input, ok := <-input:
+					resultErr := Result[R]{}
+					if !ok {
+						fmt.Println("channel close or input not correct", input) // when go close the channel input, we will receive zero value as default
+						return
+					}
+					fmt.Printf("Worker %d: Receive the input %v.\n", i, input)
+
+					result, err := fn(input)
+					if err != nil {
+						resultErr.Err = err
+						select {
+						case <-ctx.Done():
+							return
+						case out <- resultErr:
+						}
+						continue
+					}
+					resultErr.Value = result
+					select {
+					case <-ctx.Done():
+						return
+					case out <- resultErr:
+					}
+				}
+			}
+		}(i)
+
+	}
+	go func() {
+		wg.Wait()
+		close(out)
+	}()
+
+	return out
+}
+
 type User struct {
 	ID   int
 	Name string
@@ -118,14 +187,31 @@ type Product struct {
 	Price float64
 }
 
+type Result[T any] struct {
+	Value T
+	Err   error
+}
+
+func calculateDiscount(product Product) (float64, error) {
+	if product.Price < 0 {
+		return 0, fmt.Errorf("invalid price for product %s with price %f", product.Name, product.Price)
+	}
+
+	return product.Price * 0.9, nil
+}
+
 func main() {
 	ctx := context.Background()
+	useMapErr(ctx)
+}
+
+func useFilter(ctx context.Context) {
 	products := []Product{
 		{1, "Laptop", 1200},
 		{2, "Mouse", 25},
 		{3, "Keyboard", 80},
 		{4, "Monitor", 350},
-	}
+		{5, "Chip", -350}}
 
 	input := FromSlice(ctx, products)
 
@@ -137,7 +223,72 @@ func main() {
 		return product.Name
 	})
 
+	totalPrice := Reduce(
+		FromSlice(ctx, products),
+		0.0,
+		func(total float64, product Product) float64 {
+			return total + product.Price
+		},
+	)
+	fmt.Println(totalPrice) // 55
+
 	for result := range named {
 		fmt.Println(result)
 	}
+}
+
+func useReduce(ctx context.Context) {
+	numbers := []int{1, 2, 3, 4, 5}
+	input := FromSlice(ctx, numbers)
+
+	squared := Map(ctx, input, 3, func(n int) int {
+		return n * n
+	})
+
+	total := Reduce(squared, 0, func(acc, n int) int {
+		return acc + n
+	})
+
+	fmt.Println(total) // 55
+}
+
+func useMapErr(ctx context.Context) {
+	products := []Product{
+		{1, "Laptop", 1200},
+		{2, "Mouse", 25},
+		{3, "Keyboard", 80},
+		{4, "Monitor", 350},
+		{5, "Chip", -350},
+	}
+
+	input := FromSlice(ctx, products)
+
+	// filtered := Filter(ctx, input, 3, func(product Product) bool {
+	// 	return product.Price >= 100
+	// })
+
+	results := MapErr(
+		ctx,
+		input,
+		3,
+		calculateDiscount,
+	)
+
+	for result := range results {
+		if result.Err != nil {
+			fmt.Println("error:", result.Err)
+			continue
+		}
+
+		fmt.Println("discounted price:", result.Value)
+	}
+
+	totalPrice := Reduce(
+		FromSlice(ctx, products),
+		0.0,
+		func(total float64, product Product) float64 {
+			return total + product.Price
+		},
+	)
+	fmt.Println("totalPrice ", totalPrice)
 }
