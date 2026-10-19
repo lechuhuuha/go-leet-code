@@ -123,6 +123,7 @@ func MapErr[T any, R any](
 	input <-chan T,
 	workers int,
 	fn func(T) (R, error),
+	cancel context.CancelFunc,
 ) <-chan Result[R] {
 	out := make(chan Result[R])
 	wg := sync.WaitGroup{}
@@ -155,7 +156,12 @@ func MapErr[T any, R any](
 							return
 						case out <- resultErr:
 						}
-						continue
+
+						cancel() // cancellation waits until the error is received
+						// If the consumer is slow or stops reading, Worker 1 may block sending the error and never reach cancel().
+						fmt.Printf("Worker %d Cancelling all workers...\n", i)
+
+						return
 					}
 					resultErr.Value = result
 					select {
@@ -201,15 +207,15 @@ func calculateDiscount(product Product) (float64, error) {
 }
 
 func main() {
-	ctx := context.Background()
-	useMapErr(ctx)
+	ctx, cancel := context.WithCancel(context.Background())
+	useMapErr(ctx, cancel)
 }
 
 func useFilter(ctx context.Context) {
 	products := []Product{
 		{1, "Laptop", 1200},
 		{2, "Mouse", 25},
-		{3, "Keyboard", 80},
+		{3, "Keyboard", -80},
 		{4, "Monitor", 350},
 		{5, "Chip", -350}}
 
@@ -252,11 +258,11 @@ func useReduce(ctx context.Context) {
 	fmt.Println(total) // 55
 }
 
-func useMapErr(ctx context.Context) {
+func useMapErr(ctx context.Context, cancel context.CancelFunc) {
 	products := []Product{
 		{1, "Laptop", 1200},
 		{2, "Mouse", 25},
-		{3, "Keyboard", 80},
+		{3, "Keyboard", -80},
 		{4, "Monitor", 350},
 		{5, "Chip", -350},
 	}
@@ -272,6 +278,7 @@ func useMapErr(ctx context.Context) {
 		input,
 		3,
 		calculateDiscount,
+		cancel,
 	)
 
 	for result := range results {
