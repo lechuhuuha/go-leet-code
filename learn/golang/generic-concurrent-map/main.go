@@ -220,6 +220,65 @@ func Merge[T any](
 	return out
 }
 
+func Batch[T any](
+	ctx context.Context,
+	input <-chan T,
+	batchSize int,
+) <-chan []T {
+	out := make(chan []T)
+	wg := sync.WaitGroup{}
+	wg.Add(1)
+	if batchSize <= 0 {
+		batchSize = 1
+	}
+	go func() {
+		batchSlice := []T{}
+
+		defer wg.Done()
+		for {
+			select {
+			case <-ctx.Done():
+				fmt.Printf("Context cancelled. Exiting.\n")
+				return
+			case result, ok := <-input:
+				if !ok {
+					fmt.Println("channel close or input not correct", input) // when go close the channel input, we will receive zero value as default
+					if len(batchSlice) > 0 {
+						select {
+						case <-ctx.Done():
+							return
+						case out <- batchSlice:
+						}
+					}
+					return
+				}
+
+				batchSlice = append(batchSlice, result)
+				// fmt.Println("result", result, batchSlice)
+				if len(batchSlice) == batchSize {
+					batchSliceCopy := make([]T, len(batchSlice))
+					copy(batchSliceCopy, batchSlice)
+					select {
+					case <-ctx.Done():
+						return
+					case out <- batchSliceCopy:
+						batchSlice = batchSlice[:0]
+
+					}
+
+				}
+
+			}
+		}
+	}()
+
+	go func() {
+		wg.Wait()
+		close(out)
+	}()
+	return out
+}
+
 type User struct {
 	ID   int
 	Name string
@@ -248,7 +307,7 @@ func main() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	// useMapErr(ctx, cancel)
-	useMerge(ctx)
+	useBatch(ctx)
 }
 
 func useFilter(ctx context.Context) {
@@ -348,5 +407,17 @@ func useMerge(ctx context.Context) {
 
 	for value := range merged {
 		fmt.Println(value)
+	}
+}
+
+func useBatch(ctx context.Context) {
+	input := FromSlice(ctx, []int{
+		1, 2, 3, 4, 5, 6, 7, 8, 9, 10,
+	})
+
+	batches := Batch(ctx, input, 3)
+
+	for batch := range batches {
+		fmt.Println(batch)
 	}
 }
