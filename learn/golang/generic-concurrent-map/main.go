@@ -314,7 +314,7 @@ func BatchWithInterval[T any](
 			case result, ok := <-input:
 				if !ok {
 					fmt.Println("channel close or input not correct", input) // when go close the channel input, we will receive zero value as default
-					if len(batchSlice) > 0 {
+					if len(batchSlice) > 0 {                                 // final flush
 						select {
 						case <-ctx.Done():
 							fmt.Printf("Context cancelled. Exiting.\n")
@@ -395,7 +395,8 @@ func main() {
 	defer cancel()
 	// useMapErr(ctx, cancel)
 	// useBatch(ctx)
-	useBatchWithInterval(ctx)
+	// useBatchWithInterval(ctx)
+	useRunLimited(ctx)
 }
 
 func useFilter(ctx context.Context) {
