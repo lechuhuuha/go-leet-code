@@ -213,3 +213,140 @@ func useRunLimited(ctx context.Context) {
 	useRunLimitedCancellation(ctx)
 	useRunLimitedSequential(ctx)
 }
+
+func RunLimitedWithSemaphore[T any](
+	ctx context.Context,
+	items []T,
+	sem *boundedSemaphore,
+	fn func(context.Context, T) error,
+) []error {
+	errorsSlice := make([]error, len(items))
+	wg := sync.WaitGroup{}
+
+	for index, item := range items {
+		if err := ctx.Err(); err != nil {
+			// reason why we use index as the starting point
+			// if error happen, we only write error to the index that
+			// no go routine have ever claim
+			// to prevent race condition map write
+			for j := index; j < len(items); j++ {
+				errorsSlice[j] = ctx.Err()
+			}
+			break
+		}
+
+		if err := sem.Acquire(ctx); err != nil {
+			for j := index; j < len(items); j++ {
+				errorsSlice[j] = ctx.Err()
+
+			}
+			break
+		}
+
+		if err := ctx.Err(); err != nil {
+			sem.Release()
+			for j := index; j < len(items); j++ {
+				errorsSlice[j] = ctx.Err()
+			}
+			break
+		}
+
+		wg.Add(1)
+		go func(i int, item T) {
+			defer func() {
+				sem.Release()
+				wg.Done()
+			}()
+			select {
+			case <-ctx.Done():
+				errorsSlice[i] = ctx.Err()
+			default:
+				err := fn(ctx, item)
+				if err != nil {
+					errorsSlice[i] = err
+				}
+			}
+
+		}(index, item)
+	}
+
+	wg.Wait()
+	return errorsSlice
+}
+
+func useSharedSemaphore(ctx context.Context) {
+	sem := NewUnboundedSemaphore(3)
+
+	ctxA, cancelA := context.WithCancel(ctx)
+	defer cancelA()
+
+	ctxB, cancelB := context.WithCancel(ctx)
+	defer cancelB()
+
+	ordersA := []int{1, 2, 3, 4, 5, 6}
+	ordersB := []int{101, 102, 103, 104, 105, 106}
+
+	var mu sync.Mutex
+	active := 0
+	maxObserved := 0
+
+	processOrder := func(ctx context.Context, orderID int) error {
+		mu.Lock()
+		active++
+		if active > maxObserved {
+			maxObserved = active
+		}
+		fmt.Printf("START order %d | active: %d\n", orderID, active)
+		mu.Unlock()
+
+		defer func() {
+			mu.Lock()
+			active--
+			fmt.Printf("END   order %d | active: %d\n", orderID, active)
+			mu.Unlock()
+		}()
+
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-time.After(300 * time.Millisecond):
+			return nil
+		}
+	}
+
+	var wg sync.WaitGroup
+	wg.Add(2)
+
+	var errsA, errsB []error
+
+	go func() {
+		defer wg.Done()
+		errsA = RunLimitedWithSemaphore(
+			ctxA, ordersA, sem, processOrder,
+		)
+	}()
+
+	go func() {
+		defer wg.Done()
+		errsB = RunLimitedWithSemaphore(
+			ctxB, ordersB, sem, processOrder,
+		)
+	}()
+
+	// Cancel only request A while both requests are processing.
+	timer := time.AfterFunc(100*time.Millisecond, func() {
+		fmt.Println(">>> Cancelling Request A")
+		cancelA()
+	})
+	defer timer.Stop()
+
+	wg.Wait()
+
+	fmt.Printf("\nMaximum concurrency: %d (limit: 3)\n", maxObserved)
+
+	fmt.Println("\nRequest A results:")
+	printRunLimitedResults(ordersA, errsA)
+
+	fmt.Println("\nRequest B results:")
+	printRunLimitedResults(ordersB, errsB)
+}

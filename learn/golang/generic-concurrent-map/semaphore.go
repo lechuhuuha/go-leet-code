@@ -31,3 +31,28 @@ func (s *semaphore) Acquire() error {
 func (s *semaphore) Release() {
 	<-s.sem
 }
+
+type boundedSemaphore struct {
+	sem chan struct{}
+}
+
+func NewUnboundedSemaphore(nums int) *boundedSemaphore {
+	sem := make(chan struct{}, nums)
+	return &boundedSemaphore{
+		sem: sem,
+	}
+}
+
+func (s *boundedSemaphore) Acquire(ctx context.Context) error {
+	select {
+	case <-ctx.Done():
+		fmt.Printf("Context cancelled. Exiting Acquire.\n")
+		return ctx.Err()
+	case s.sem <- struct{}{}:
+		return nil
+	}
+}
+
+func (s *boundedSemaphore) Release() {
+	<-s.sem
+}
