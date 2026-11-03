@@ -1,8 +1,6 @@
 package main
 
-import (
-	"context"
-)
+import "context"
 
 func main() {
 	ctx, cancel := context.WithCancel(context.Background())
@@ -10,5 +8,7 @@ func main() {
 	// useMapErr(ctx, cancel)
 	// useBatch(ctx)
 	// useBatchWithInterval(ctx)
-	useSharedSemaphore(ctx)
+	// useSharedSemaphore(ctx)
+	UseScheduler()
+	UseAnotherScheduler(ctx)
 }

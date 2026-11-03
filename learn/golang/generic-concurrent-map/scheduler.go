@@ -1,5 +1,11 @@
 package main
 
+import (
+	"context"
+	"fmt"
+	"slices"
+)
+
 type Job struct {
 	RequestID  string
 	CustomerID string
@@ -8,26 +14,77 @@ type Job struct {
 
 type Scheduler struct {
 	pending map[string][]Job
-	ready   []string
+	ready   ReadySlice
+}
+
+type ReadySlice []string
+
+func (s *ReadySlice) Pop() string {
+	if len(*s) == 0 {
+		return ""
+	}
+	customerID := (*s)[0]
+	(*s)[0] = ""
+
+	*s = (*s)[1:]
+	return customerID
+}
+
+func (s *ReadySlice) Push(customerID string) {
+	*s = append(*s, customerID)
+}
+
+func (s *ReadySlice) Len() int {
+	return len(*s)
 }
 
 func NewScheduler() *Scheduler {
 	return &Scheduler{
 		pending: map[string][]Job{},
-		ready:   []string{},
+		ready:   ReadySlice{},
 	}
 }
 
 func (s *Scheduler) Submit(job Job) {
-	// Add the job to the correct RequestID queue.
-	key := job.RequestID
-	s.pending[key] = append(s.pending[key], job)
+	// Add the job to the correct CustomerID queue.
+	customerID := job.CustomerID
+	// the purpose of this excersise it to maintain fairness for each customer
+	// meaning each customer should a chance to run request when their request come
+	if len(s.pending[customerID]) == 0 {
+		// that why we only append first request of each customer into the ready slice
+		s.ready.Push(customerID)
+		// s.ready = append(s.ready, customerID)
+	}
+
+	s.pending[customerID] = append(s.pending[customerID], job)
 }
 
 func (s *Scheduler) Next() (Job, bool) {
 	// Select the next job using round-robin.
 	// Return false if no jobs are pending.
+	if s.ready.Len() == 0 {
+		return Job{}, false
+	}
+	// pop the customerID
+	// customerID := s.ready[0]
+	// s.ready = s.ready[1:]
+	customerID := s.ready.Pop()
 
+	// get the first request of the current customer ready
+	jobs := s.pending[customerID]
+	job := jobs[0]
+	jobs[0] = Job{}
+	if len(jobs) == 1 {
+		// No more pending jobs for this customer.
+		delete(s.pending, customerID)
+	} else {
+		// pop the current request
+		s.pending[customerID] = jobs[1:]
+		// move customer to end
+		s.ready.Push(customerID)
+		// s.ready = append(s.ready, customerID)
+	}
+	return job, true
 }
 
 func (s *Scheduler) RoundRobin() []string {
@@ -36,25 +93,94 @@ func (s *Scheduler) RoundRobin() []string {
 	}
 
 	maxRows := 0
-	totalJobs := 0
 	for _, request := range s.pending {
-		totalJobs += len(request)
 		if maxRows < len(request) {
 			maxRows = len(request)
 		}
 	}
-	jobOrders := make([]string, totalJobs)
 
-	for i := 0; i < maxRows; i++ { // maxRows = 5, i = 4
-		for j := 0; j < len(s.pending); j++ { // j = 0, A
-			jobs := s.pending["j"] // A1   A2   A3  A4 A5
+	jobOrders := make([]string, 0)
+
+	for i := 0; i < maxRows; i++ {
+		keys := make([]string, 0, len(s.pending))
+		for k := range s.pending {
+			keys = append(keys, k)
+		}
+		slices.Sort(keys)
+
+		for _, customerID := range keys {
+			jobs := s.pending[customerID]
 			if i >= len(jobs) {
 				continue
 			}
 
-			jobOrders = append(jobOrders, jobs) // [A1, B101, C201, A2, B102, C202, A3, C203, A4, A5]
+			jobOrders = append(jobOrders, customerID)
 		}
 	}
 
 	return jobOrders
+}
+
+func UseScheduler() {
+	scheduler := NewScheduler()
+	jobs := []Job{
+		{
+			RequestID:  "1",
+			CustomerID: "1",
+			OrderID:    1,
+		},
+		{
+			RequestID:  "2",
+			CustomerID: "1",
+			OrderID:    2,
+		},
+		{
+			RequestID:  "3",
+			CustomerID: "2",
+			OrderID:    3,
+		},
+		{
+			RequestID:  "4",
+			CustomerID: "2",
+			OrderID:    4,
+		},
+		{
+			RequestID:  "5",
+			CustomerID: "3",
+			OrderID:    5,
+		},
+	}
+
+	for _, job := range jobs {
+		scheduler.Submit(job)
+	}
+
+	for i := 0; i < len(jobs); i++ {
+		fmt.Println(scheduler.Next())
+	}
+}
+
+func UseAnotherScheduler(ctx context.Context) {
+	scheduler := NewScheduler()
+
+	scheduler.Submit(Job{RequestID: "1", CustomerID: "A", OrderID: 1})
+	scheduler.Submit(Job{RequestID: "2", CustomerID: "A", OrderID: 2})
+	scheduler.Submit(Job{RequestID: "3", CustomerID: "B", OrderID: 3})
+	scheduler.Submit(Job{RequestID: "4", CustomerID: "B", OrderID: 4})
+
+	// A gets the first turn.
+	job, _ := scheduler.Next()
+	fmt.Println("Next:", job.OrderID)
+
+	// A new customer arrives while scheduling is in progress.
+	scheduler.Submit(Job{RequestID: "5", CustomerID: "C", OrderID: 5})
+
+	for {
+		job, ok := scheduler.Next()
+		if !ok {
+			break
+		}
+
+		fmt.Println("Next:", job.OrderID)
+	}
 }
