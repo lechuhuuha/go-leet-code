@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"slices"
+	"sync"
 )
 
 type Job struct {
@@ -13,6 +14,7 @@ type Job struct {
 }
 
 type Scheduler struct {
+	mu      sync.Mutex
 	pending map[string][]Job
 	ready   ReadySlice
 }
@@ -42,10 +44,13 @@ func NewScheduler() *Scheduler {
 	return &Scheduler{
 		pending: map[string][]Job{},
 		ready:   ReadySlice{},
+		mu:      sync.Mutex{},
 	}
 }
 
 func (s *Scheduler) Submit(job Job) {
+	s.mu.TryLock()
+	defer s.mu.Unlock()
 	// Add the job to the correct CustomerID queue.
 	customerID := job.CustomerID
 	// the purpose of this excersise it to maintain fairness for each customer
@@ -60,6 +65,9 @@ func (s *Scheduler) Submit(job Job) {
 }
 
 func (s *Scheduler) Next() (Job, bool) {
+	s.mu.TryLock()
+	defer s.mu.Unlock()
+
 	// Select the next job using round-robin.
 	// Return false if no jobs are pending.
 	if s.ready.Len() == 0 {
