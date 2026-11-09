@@ -3,8 +3,8 @@ package main
 import (
 	"context"
 	"fmt"
-	"slices"
 	"sync"
+	"time"
 )
 
 type Job struct {
@@ -17,6 +17,8 @@ type Scheduler struct {
 	mu      sync.Mutex
 	pending map[string][]Job
 	ready   ReadySlice
+
+	notify chan struct{}
 }
 
 type ReadySlice []string
@@ -45,11 +47,12 @@ func NewScheduler() *Scheduler {
 		pending: map[string][]Job{},
 		ready:   ReadySlice{},
 		mu:      sync.Mutex{},
+		notify:  make(chan struct{}),
 	}
 }
 
 func (s *Scheduler) Submit(job Job) {
-	s.mu.TryLock()
+	s.mu.Lock()
 	defer s.mu.Unlock()
 	// Add the job to the correct CustomerID queue.
 	customerID := job.CustomerID
@@ -62,12 +65,53 @@ func (s *Scheduler) Submit(job Job) {
 	}
 
 	s.pending[customerID] = append(s.pending[customerID], job)
+
+	// Wake waiting workers, then create a new notification channel.
+	close(s.notify)
+	// each go routine close different chan, avoid panic: close of closed channel
+	// Creating a new channel allows future workers to wait for the next notification.
+	s.notify = make(chan struct{})
 }
 
 func (s *Scheduler) Next() (Job, bool) {
-	s.mu.TryLock()
+	s.mu.Lock()
 	defer s.mu.Unlock()
 
+	return s.Pop()
+}
+
+func (s *Scheduler) WaitNext(ctx context.Context) (Job, bool) {
+	for {
+		s.mu.Lock()
+		// ctx is return and we can check for the err on why
+		if ctx.Err() != nil {
+			s.mu.Unlock()
+			return Job{}, false
+		}
+		// if the queue is ready to pop
+		if s.ready.Len() > 0 {
+			job, ok := s.Pop()
+			s.mu.Unlock()
+			return job, ok
+		}
+		// acquire the notify chan
+		notify := s.notify
+		// so the main reason its because we wake go routine by use close chan
+		// so if the worker listen on the new chan
+		// they never knew about the close one
+		// which lead to them miss the notify
+		// and all go worker might miss which make the notification lost
+		s.mu.Unlock()
+
+		select {
+		case <-ctx.Done():
+			return Job{}, false
+		case <-notify:
+		}
+	}
+}
+
+func (s *Scheduler) Pop() (Job, bool) {
 	// Select the next job using round-robin.
 	// Return false if no jobs are pending.
 	if s.ready.Len() == 0 {
@@ -93,40 +137,6 @@ func (s *Scheduler) Next() (Job, bool) {
 		// s.ready = append(s.ready, customerID)
 	}
 	return job, true
-}
-
-func (s *Scheduler) RoundRobin() []string {
-	if len(s.pending) == 0 {
-		return []string{}
-	}
-
-	maxRows := 0
-	for _, request := range s.pending {
-		if maxRows < len(request) {
-			maxRows = len(request)
-		}
-	}
-
-	jobOrders := make([]string, 0)
-
-	for i := 0; i < maxRows; i++ {
-		keys := make([]string, 0, len(s.pending))
-		for k := range s.pending {
-			keys = append(keys, k)
-		}
-		slices.Sort(keys)
-
-		for _, customerID := range keys {
-			jobs := s.pending[customerID]
-			if i >= len(jobs) {
-				continue
-			}
-
-			jobOrders = append(jobOrders, customerID)
-		}
-	}
-
-	return jobOrders
 }
 
 func UseScheduler() {
@@ -191,4 +201,74 @@ func UseAnotherScheduler(ctx context.Context) {
 
 		fmt.Println("Next:", job.OrderID)
 	}
+}
+
+func useWaitNext(ctx context.Context) {
+	scheduler := NewScheduler()
+
+	ctx, cancel := context.WithTimeout(ctx, 2*time.Second)
+	defer cancel()
+
+	var wg sync.WaitGroup
+
+	for i := 1; i <= 3; i++ {
+		wg.Add(1)
+
+		go func(workerID int) {
+			defer wg.Done()
+
+			fmt.Printf("Worker %d waiting...\n", workerID)
+
+			job, ok := scheduler.WaitNext(ctx)
+			if !ok {
+				fmt.Printf("Worker %d stopped waiting\n", workerID)
+				return
+			}
+
+			fmt.Printf("Worker %d received order %d\n", workerID, job.OrderID)
+		}(i)
+	}
+
+	time.Sleep(200 * time.Millisecond)
+
+	scheduler.Submit(Job{
+		RequestID:  "R1",
+		CustomerID: "A",
+		OrderID:    1,
+	})
+
+	wg.Wait()
+}
+
+func useConcurrentScheduler(ctx context.Context) {
+	scheduler := NewScheduler()
+
+	var wg sync.WaitGroup
+
+	for i := 1; i <= 100; i++ {
+		wg.Add(1)
+
+		go func(orderID int) {
+			defer wg.Done()
+
+			scheduler.Submit(Job{
+				RequestID:  fmt.Sprintf("R%d", orderID),
+				CustomerID: fmt.Sprintf("C%d", orderID%5),
+				OrderID:    orderID,
+			})
+		}(i)
+	}
+
+	wg.Wait()
+
+	count := 0
+	for count < 100 {
+		_, ok := scheduler.WaitNext(ctx)
+		if !ok {
+			break
+		}
+		count++
+	}
+
+	fmt.Printf("Processed %d/100 jobs\n", count)
 }
