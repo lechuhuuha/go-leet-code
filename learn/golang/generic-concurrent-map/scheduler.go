@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"sync"
+	"sync/atomic"
 	"time"
 )
 
@@ -111,6 +112,29 @@ func (s *Scheduler) WaitNext(ctx context.Context) (Job, bool) {
 	}
 }
 
+func (s *Scheduler) WaitReady(ctx context.Context) bool {
+	for {
+		s.mu.Lock()
+		if ctx.Err() != nil {
+			s.mu.Unlock()
+			return false
+		}
+		// if the queue is ready to pop
+		if s.ready.Len() > 0 {
+			s.mu.Unlock()
+			return true
+		}
+		notify := s.notify
+		s.mu.Unlock()
+
+		select {
+		case <-ctx.Done():
+			return false
+		case <-notify:
+		}
+	}
+}
+
 func (s *Scheduler) Pop() (Job, bool) {
 	// Select the next job using round-robin.
 	// Return false if no jobs are pending.
@@ -137,6 +161,70 @@ func (s *Scheduler) Pop() (Job, bool) {
 		// s.ready = append(s.ready, customerID)
 	}
 	return job, true
+}
+
+func RunScheduler(
+	ctx context.Context,
+	scheduler *Scheduler,
+	sem *unboundedSemaphore,
+	workers int,
+	fn func(context.Context, Job) error,
+) {
+	wg := sync.WaitGroup{}
+
+	if workers <= 0 {
+		workers = 1
+	}
+
+	for i := 0; i < workers; i++ {
+		wg.Add(1)
+		go func(index int) {
+			defer wg.Done()
+
+			for {
+				select {
+				case <-ctx.Done():
+					return
+				default:
+					isReady := scheduler.WaitReady(ctx)
+					if !isReady {
+						fmt.Println("ctx finished")
+						return
+					}
+
+					if err := sem.Acquire(ctx); err != nil {
+						fmt.Println("err sem.Acquire", err)
+						return
+					}
+
+					if err := ctx.Err(); err != nil {
+						fmt.Println("err ctx.Err()", err)
+						sem.Release()
+						return
+					}
+
+					job, ok := scheduler.Next()
+					if !ok {
+						fmt.Println("no ready job, continue")
+						sem.Release()
+						continue
+					}
+
+					// This ensures sem.Release() executes whenever fn returns, including during panic unwinding.
+					// An unrecovered panic would still terminate the program.
+					func() {
+						defer sem.Release()
+
+						if err := fn(ctx, job); err != nil {
+							fmt.Printf("Order %d failed: %v\n", job.OrderID, err)
+						}
+					}()
+				}
+			}
+		}(i)
+
+	}
+	wg.Wait()
 }
 
 func UseScheduler() {
@@ -271,4 +359,75 @@ func useConcurrentScheduler(ctx context.Context) {
 	}
 
 	fmt.Printf("Processed %d/100 jobs\n", count)
+}
+
+func useRunScheduler(ctx context.Context) {
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
+	scheduler := NewScheduler()
+	sem := NewUnboundedSemaphore(3)
+
+	jobs := []Job{
+		{CustomerID: "A", OrderID: 1},
+		{CustomerID: "A", OrderID: 2},
+		{CustomerID: "A", OrderID: 3},
+		{CustomerID: "A", OrderID: 4},
+		{CustomerID: "A", OrderID: 5},
+		{CustomerID: "B", OrderID: 101},
+		{CustomerID: "B", OrderID: 102},
+		{CustomerID: "C", OrderID: 201},
+	}
+
+	for _, job := range jobs {
+		scheduler.Submit(job)
+	}
+
+	var completed atomic.Int32
+	var active atomic.Int32
+	var maxObserved atomic.Int32
+
+	RunScheduler(ctx, scheduler, sem, 5,
+		func(ctx context.Context, job Job) error {
+			current := active.Add(1)
+			defer active.Add(-1)
+
+			// Track maximum concurrency.
+			for {
+				old := maxObserved.Load()
+				if current <= old ||
+					maxObserved.CompareAndSwap(old, current) {
+					break
+				}
+			}
+
+			fmt.Printf(
+				"START customer=%s order=%d active=%d\n",
+				job.CustomerID,
+				job.OrderID,
+				current,
+			)
+
+			select {
+			case <-ctx.Done():
+				return ctx.Err()
+			case <-time.After(100 * time.Millisecond):
+			}
+
+			fmt.Printf("DONE order=%d\n", job.OrderID)
+
+			if completed.Add(1) == int32(len(jobs)) {
+				cancel()
+			}
+
+			return nil
+		},
+	)
+
+	fmt.Printf(
+		"Completed: %d/%d\nMax concurrency: %d\n",
+		completed.Load(),
+		len(jobs),
+		maxObserved.Load(),
+	)
 }

@@ -36,7 +36,7 @@ func (s *semaphore) Release() {
 	<-s.sem
 }
 
-type boundedSemaphore struct {
+type unboundedSemaphore struct {
 	sem chan struct{}
 }
 
@@ -44,14 +44,14 @@ type boundedSemaphore struct {
 // Each Acquire uses the context provided by its caller.
 // Cancelling one caller's context does not affect other callers.
 // Use when callers need independent cancellation.
-func NewUnboundedSemaphore(nums int) *boundedSemaphore {
+func NewUnboundedSemaphore(nums int) *unboundedSemaphore {
 	sem := make(chan struct{}, nums)
-	return &boundedSemaphore{
+	return &unboundedSemaphore{
 		sem: sem,
 	}
 }
 
-func (s *boundedSemaphore) Acquire(ctx context.Context) error {
+func (s *unboundedSemaphore) Acquire(ctx context.Context) error {
 	select {
 	case <-ctx.Done():
 		fmt.Printf("Context cancelled. Exiting Acquire.\n")
@@ -61,6 +61,6 @@ func (s *boundedSemaphore) Acquire(ctx context.Context) error {
 	}
 }
 
-func (s *boundedSemaphore) Release() {
+func (s *unboundedSemaphore) Release() {
 	<-s.sem
 }

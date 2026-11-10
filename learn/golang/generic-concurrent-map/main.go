@@ -9,8 +9,9 @@ func main() {
 	// useBatch(ctx)
 	// useBatchWithInterval(ctx)
 	// useSharedSemaphore(ctx)
-	UseScheduler()
-	// UseAnotherScheduler(ctx)
-	useWaitNext(ctx)
-	useConcurrentScheduler(ctx)
+	// UseScheduler()
+	// // UseAnotherScheduler(ctx)
+	// useWaitNext(ctx)
+	// useConcurrentScheduler(ctx)
+	useRunScheduler(ctx)
 }

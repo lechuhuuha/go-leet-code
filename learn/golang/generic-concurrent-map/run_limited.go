@@ -217,7 +217,7 @@ func useRunLimited(ctx context.Context) {
 func RunLimitedWithSemaphore[T any](
 	ctx context.Context,
 	items []T,
-	sem *boundedSemaphore,
+	sem *unboundedSemaphore,
 	fn func(context.Context, T) error,
 ) []error {
 	errorsSlice := make([]error, len(items))
