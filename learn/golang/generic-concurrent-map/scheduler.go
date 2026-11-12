@@ -15,9 +15,10 @@ type Job struct {
 }
 
 type Scheduler struct {
-	mu      sync.Mutex
-	pending map[string][]Job
-	ready   ReadySlice
+	mu         sync.Mutex
+	pending    map[string][]Job
+	ready      ReadySlice
+	processing map[int]Job // OrderID -> claimed job
 
 	notify chan struct{}
 }
@@ -45,16 +46,22 @@ func (s *ReadySlice) Len() int {
 
 func NewScheduler() *Scheduler {
 	return &Scheduler{
-		pending: map[string][]Job{},
-		ready:   ReadySlice{},
-		mu:      sync.Mutex{},
-		notify:  make(chan struct{}),
+		pending:    make(map[string][]Job),
+		ready:      ReadySlice{},
+		mu:         sync.Mutex{},
+		notify:     make(chan struct{}),
+		processing: make(map[int]Job),
 	}
 }
 
 func (s *Scheduler) Submit(job Job) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+
+	s.submit(job)
+}
+
+func (s *Scheduler) submit(job Job) {
 	// Add the job to the correct CustomerID queue.
 	customerID := job.CustomerID
 	// the purpose of this excersise it to maintain fairness for each customer
@@ -160,7 +167,36 @@ func (s *Scheduler) Pop() (Job, bool) {
 		s.ready.Push(customerID)
 		// s.ready = append(s.ready, customerID)
 	}
+	s.processing[job.OrderID] = job
 	return job, true
+}
+
+// ACK marks a claimed job as successfully processed.
+func (s *Scheduler) Ack(orderID int) bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if _, ok := s.processing[orderID]; !ok {
+		return false
+	}
+	delete(s.processing, orderID)
+	return true
+}
+
+// NACK requeues a claimed job for another attempt.
+func (s *Scheduler) Nack(orderID int) bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	job, ok := s.processing[orderID]
+	if !ok {
+		return false
+	}
+	delete(s.processing, orderID)
+
+	s.submit(job)
+
+	return true
 }
 
 func RunScheduler(
@@ -217,7 +253,9 @@ func RunScheduler(
 
 						if err := fn(ctx, job); err != nil {
 							fmt.Printf("Order %d failed: %v\n", job.OrderID, err)
+							scheduler.Nack(job.OrderID)
 						}
+						scheduler.Ack(job.OrderID)
 					}()
 				}
 			}
