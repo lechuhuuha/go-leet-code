@@ -198,7 +198,8 @@ func (s *Scheduler) Ack(job Job) bool {
 	delete(s.processingCustomers, customerID)
 
 	if len(s.pending[customerID]) > 0 {
-		// move customer to end
+		// if this customer A finished process order A
+		// and there is still order from this customer, we add it into the ready slice
 		s.ready.Push(customerID)
 
 		s.notifyLocked()
@@ -220,6 +221,7 @@ func (s *Scheduler) Nack(job Job) bool {
 	delete(s.processing, orderID)
 
 	// Requeue at the front to preserve strict FIFO.
+	// make sure that orders of the customer will be process FIFO
 	s.pending[customerID] = append(
 		[]Job{job},
 		s.pending[customerID]...,
@@ -267,6 +269,9 @@ func RunScheduler(
 						return
 					}
 
+					// so we make sure that order A1 of customer A will be process until failure
+					// A2 will have to wait and will not be in ready slice so the next func will not call that customer
+					// it will call other customer to process
 					job, ok := scheduler.Next()
 					if !ok {
 						fmt.Println("no ready job, continue")
