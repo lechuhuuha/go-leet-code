@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"slices"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -19,6 +20,8 @@ type Scheduler struct {
 	pending    map[string][]Job
 	ready      ReadySlice
 	processing map[int]Job // OrderID -> claimed job
+
+	processingCustomers map[string]bool
 
 	notify chan struct{}
 }
@@ -40,17 +43,24 @@ func (s *ReadySlice) Push(customerID string) {
 	*s = append(*s, customerID)
 }
 
+func (s *ReadySlice) Unshift(customerID string) {
+	*s = append(*s, "")
+	copy((*s)[1:], *s)
+	(*s)[0] = customerID
+}
+
 func (s *ReadySlice) Len() int {
 	return len(*s)
 }
 
 func NewScheduler() *Scheduler {
 	return &Scheduler{
-		pending:    make(map[string][]Job),
-		ready:      ReadySlice{},
-		mu:         sync.Mutex{},
-		notify:     make(chan struct{}),
-		processing: make(map[int]Job),
+		pending:             make(map[string][]Job),
+		ready:               ReadySlice{},
+		mu:                  sync.Mutex{},
+		notify:              make(chan struct{}),
+		processing:          make(map[int]Job),
+		processingCustomers: map[string]bool{},
 	}
 }
 
@@ -64,16 +74,22 @@ func (s *Scheduler) Submit(job Job) {
 func (s *Scheduler) submit(job Job) {
 	// Add the job to the correct CustomerID queue.
 	customerID := job.CustomerID
-	// the purpose of this excersise it to maintain fairness for each customer
-	// meaning each customer should a chance to run request when their request come
-	if len(s.pending[customerID]) == 0 {
-		// that why we only append first request of each customer into the ready slice
-		s.ready.Push(customerID)
-		// s.ready = append(s.ready, customerID)
-	}
+	wasEmpty := len(s.pending[customerID]) == 0
 
+	// the purpose of this excersise it to maintain fairness for each customer and strict FIFO
+	// meaning each customer should a chance to run request when their request come
+	// and each of their order must be in strict FIFO
 	s.pending[customerID] = append(s.pending[customerID], job)
 
+	// meaning there is no worker process this customer
+	if wasEmpty && !s.processingCustomers[customerID] && !slices.Contains(s.ready, customerID) {
+		// then we allow this customer to process
+		s.ready.Push(customerID)
+		s.notifyLocked()
+	}
+}
+
+func (s *Scheduler) notifyLocked() {
 	// Wake waiting workers, then create a new notification channel.
 	close(s.notify)
 	// each go routine close different chan, avoid panic: close of closed channel
@@ -149,10 +165,7 @@ func (s *Scheduler) Pop() (Job, bool) {
 		return Job{}, false
 	}
 	// pop the customerID
-	// customerID := s.ready[0]
-	// s.ready = s.ready[1:]
 	customerID := s.ready.Pop()
-
 	// get the first request of the current customer ready
 	jobs := s.pending[customerID]
 	job := jobs[0]
@@ -161,41 +174,56 @@ func (s *Scheduler) Pop() (Job, bool) {
 		// No more pending jobs for this customer.
 		delete(s.pending, customerID)
 	} else {
-		// pop the current request
 		s.pending[customerID] = jobs[1:]
-		// move customer to end
-		s.ready.Push(customerID)
-		// s.ready = append(s.ready, customerID)
 	}
+	s.processingCustomers[customerID] = true
 	s.processing[job.OrderID] = job
+
 	return job, true
 }
 
 // ACK marks a claimed job as successfully processed.
-func (s *Scheduler) Ack(orderID int) bool {
+func (s *Scheduler) Ack(job Job) bool {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	if _, ok := s.processing[orderID]; !ok {
+	orderID := job.OrderID
+	claimedJob, ok := s.processing[job.OrderID]
+	if !ok {
 		return false
 	}
+	customerID := claimedJob.CustomerID
+
 	delete(s.processing, orderID)
+	delete(s.processingCustomers, customerID)
+
+	if len(s.pending[customerID]) > 0 {
+		// move customer to end
+		s.ready.Push(customerID)
+
+		s.notifyLocked()
+	}
 	return true
 }
 
 // NACK requeues a claimed job for another attempt.
-func (s *Scheduler) Nack(orderID int) bool {
+func (s *Scheduler) Nack(job Job) bool {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-
-	job, ok := s.processing[orderID]
+	orderID := job.OrderID
+	claimedJob, ok := s.processing[job.OrderID]
 	if !ok {
 		return false
 	}
+	customerID := claimedJob.CustomerID
+
 	delete(s.processing, orderID)
 
-	s.submit(job)
-
+	// Requeue at the front to preserve strict FIFO.
+	s.pending[customerID] = append(
+		[]Job{job},
+		s.pending[customerID]...,
+	)
 	return true
 }
 
@@ -251,11 +279,13 @@ func RunScheduler(
 					func() {
 						defer sem.Release()
 
-						if err := fn(ctx, job); err != nil {
+						err := fn(ctx, job)
+						if err != nil {
 							fmt.Printf("Order %d failed: %v\n", job.OrderID, err)
-							scheduler.Nack(job.OrderID)
+							scheduler.Nack(job)
+							return
 						}
-						scheduler.Ack(job.OrderID)
+						scheduler.Ack(job)
 					}()
 				}
 			}
