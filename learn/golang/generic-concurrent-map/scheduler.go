@@ -23,6 +23,8 @@ type Scheduler struct {
 
 	processingCustomers map[string]bool
 
+	retryWaiting map[string]bool
+
 	notify chan struct{}
 }
 
@@ -61,6 +63,7 @@ func NewScheduler() *Scheduler {
 		notify:              make(chan struct{}),
 		processing:          make(map[int]Job),
 		processingCustomers: map[string]bool{},
+		retryWaiting:        make(map[string]bool),
 	}
 }
 
@@ -158,6 +161,31 @@ func (s *Scheduler) WaitReady(ctx context.Context) bool {
 	}
 }
 
+func (s *Scheduler) RetryReady(customerID string) bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if !s.retryWaiting[customerID] {
+		return false
+	}
+
+	if len(s.pending[customerID]) == 0 {
+		return false
+	}
+	if s.processingCustomers[customerID] || slices.Contains(s.ready, customerID) {
+		return false
+	}
+
+	delete(s.retryWaiting, customerID)
+	delete(s.processingCustomers, customerID)
+
+	s.ready.Push(customerID)
+
+	s.notifyLocked()
+
+	return true
+}
+
 func (s *Scheduler) Pop() (Job, bool) {
 	// Select the next job using round-robin.
 	// Return false if no jobs are pending.
@@ -223,9 +251,11 @@ func (s *Scheduler) Nack(job Job) bool {
 	// Requeue at the front to preserve strict FIFO.
 	// make sure that orders of the customer will be process FIFO
 	s.pending[customerID] = append(
-		[]Job{job},
+		[]Job{claimedJob},
 		s.pending[customerID]...,
 	)
+
+	s.retryWaiting[customerID] = true
 	return true
 }
 
@@ -424,10 +454,12 @@ func useConcurrentScheduler(ctx context.Context) {
 
 	count := 0
 	for count < 100 {
-		_, ok := scheduler.WaitNext(ctx)
+		job, ok := scheduler.WaitNext(ctx)
 		if !ok {
 			break
 		}
+		scheduler.Ack(job)
+
 		count++
 	}
 
@@ -503,4 +535,14 @@ func useRunScheduler(ctx context.Context) {
 		len(jobs),
 		maxObserved.Load(),
 	)
+}
+
+func useRetryReady() {
+	s := NewScheduler()
+
+	s.Submit(Job{CustomerID: "A", OrderID: 1})
+	s.Submit(Job{CustomerID: "A", OrderID: 2})
+	s.Submit(Job{CustomerID: "B", OrderID: 101})
+
+	// TODO: implement the sequence below.
 }
